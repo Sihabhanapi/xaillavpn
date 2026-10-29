@@ -22,14 +22,26 @@ jobs:
 
       - name: hev-socks5-tunnel (tun2socks)
         run: |
-          mkdir -p jni
-          echo 'include $(call all-subdir-makefiles)' > jni/Android.mk
-          git clone --recursive --depth 1 https://github.com/heiher/hev-socks5-tunnel jni/hev-socks5-tunnel
-          $ANDROID_NDK_HOME/ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=jni/Android.mk \
-            "APP_ABI=armeabi-v7a arm64-v8a" APP_PLATFORM=android-24 NDK_LIBS_OUT=./libs
+          git clone --recursive --depth 1 https://github.com/heiher/hev-socks5-tunnel hev
+          if [ -f hev/Android.mk ]; then
+            echo "Pakai Android.mk bawaan hev"
+            SCRIPT=$PWD/hev/Android.mk
+          else
+            echo "Android.mk bawaan tidak ada, pakai buatan sendiri"
+            mkdir -p jni && cp -r hev/. jni/hev-socks5-tunnel/ 2>/dev/null || true
+            echo 'include $(call all-subdir-makefiles)' > jni/Android.mk
+            SCRIPT=$PWD/jni/Android.mk
+          fi
+          $ANDROID_NDK_HOME/ndk-build NDK_PROJECT_PATH=$PWD APP_BUILD_SCRIPT=$SCRIPT \
+            "APP_ABI=armeabi-v7a arm64-v8a" APP_PLATFORM=android-24 NDK_LIBS_OUT=$PWD/libs
+          NM=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm
           for a in arm64-v8a armeabi-v7a; do
+            f=libs/$a/libhev-socks5-tunnel.so
+            echo "Cek simbol di $a:"
+            $NM -D $f | grep -E "JNI_OnLoad|TProxyStartService|TProxyStopService" \
+              || { echo "SIMBOL JNI TIDAK ADA di $a"; exit 1; }
             mkdir -p app/src/main/jniLibs/$a
-            cp libs/$a/libhev-socks5-tunnel.so app/src/main/jniLibs/$a/
+            cp $f app/src/main/jniLibs/$a/
           done
 
       - uses: gradle/actions/setup-gradle@v4
