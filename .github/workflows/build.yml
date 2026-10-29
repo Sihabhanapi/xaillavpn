@@ -1,0 +1,32 @@
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Xray-core (arm64 + armv7)
+        run: |
+          V=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+          J=app/src/main/jniLibs; mkdir -p $J/arm64-v8a $J/armeabi-v7a t
+          B=https://github.com/XTLS/Xray-core/releases/download/$V
+          curl -fsSL $B/Xray-android-arm64-v8a.zip -o t/a.zip
+          curl -fsSL $B/Xray-linux-arm32-v7a.zip -o t/b.zip
+          unzip -oj t/a.zip xray -d t/a && cp t/a/xray $J/arm64-v8a/libxray.so
+          unzip -oj t/b.zip xray -d t/b && cp t/b/xray $J/armeabi-v7a/libxray.so
+      - name: hev-socks5-tunnel (tun2socks)
+        run: |
+          mkdir -p jni && echo 'include $(call all-subdir-makefiles)' > jni/Android.mk
+          git clone --recursive --depth 1 https://github.com/heiher/hev-socks5-tunnel jni/hev-socks5-tunnel
+          $ANDROID_NDK_HOME/ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=jni/Android.mk \
+            "APP_ABI=armeabi-v7a arm64-v8a" APP_PLATFORM=android-24 NDK_LIBS_OUT=./libs
+          for a in arm64-v8a armeabi-v7a; do cp libs/$a/libhev-socks5-tunnel.so app/src/main/jniLibs/$a/; done
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - run: gradle assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xaillavpn-apk
+          path: app/build/outputs/apk/release/*.apk
