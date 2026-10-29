@@ -1,6 +1,7 @@
 package app.xailla.vpn
 import android.Manifest
 import android.app.AlertDialog
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.net.VpnService
@@ -40,6 +41,7 @@ class MainActivity : AppCompatActivity() {
                 r.findViewById<TextView>(R.id.name).text = s.name
                 r.findViewById<TextView>(R.id.ping).text =
                     if (s.ping < 0) "" else if (s.ping == 0L) "timeout" else "${s.ping} ms"
+                r.findViewById<TextView>(R.id.more).setOnClickListener { showMenu(it, pos) }
                 r.setBackgroundResource(if (pos == st.sel) R.drawable.bg_sel else R.drawable.bg_item)
                 return r
             }
@@ -47,12 +49,6 @@ class MainActivity : AppCompatActivity() {
         val lv = findViewById<ListView>(R.id.list); lv.adapter = ad
         lv.emptyView = findViewById(R.id.empty)
         lv.setOnItemClickListener { _, _, i, _ -> st.sel = i; refresh() }
-        lv.setOnItemLongClickListener { _, _, i, _ ->
-            AlertDialog.Builder(this).setMessage("Hapus \"${list[i].name}\"?")
-                .setPositiveButton("Hapus") { _, _ ->
-                    list.removeAt(i); st.save(list); if (st.sel >= list.size) st.sel = 0; refresh()
-                }.setNegativeButton("Batal", null).show(); true
-        }
         btn.setOnClickListener {
             val s = VpnSvc.state.value ?: 0
             if (s == 1 || s == 2) startService(Intent(this, VpnSvc::class.java).setAction(VpnSvc.STOP))
@@ -72,6 +68,56 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.ping).setOnClickListener { pingAll() }
         VpnSvc.state.observe(this) { refresh() }
         refresh()
+    }
+
+    private fun showMenu(anchor: View, i: Int) {
+        val pm = PopupMenu(this, anchor)
+        pm.menu.add(0, 1, 0, "Edit")
+        pm.menu.add(0, 2, 1, "Salin URL")
+        pm.menu.add(0, 3, 2, "Hapus")
+        pm.setOnMenuItemClickListener {
+            when (it.itemId) {
+                1 -> editDialog(i)
+                2 -> copyUrl(list[i].link)
+                3 -> deleteDialog(i)
+            }
+            true
+        }
+        pm.show()
+    }
+
+    private fun editDialog(i: Int) {
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(pad, pad, pad, 0) }
+        val nm = EditText(this).apply { hint = "Nama server"; setText(list[i].name) }
+        val lk = EditText(this).apply { hint = "Link (vless/vmess/trojan/ss)"; setText(list[i].link); setSingleLine(false) }
+        box.addView(nm); box.addView(lk)
+        AlertDialog.Builder(this).setTitle("Edit server").setView(box)
+            .setPositiveButton("Simpan") { _, _ ->
+                val link = lk.text.toString().trim()
+                try {
+                    val p = Cfg.parse(link)
+                    val name = nm.text.toString().trim().ifEmpty { p.name }
+                    list[i] = Srv(name, link)
+                    st.save(list); refresh()
+                    toast("Server diperbarui")
+                } catch (_: Exception) { toast("Link tidak valid") }
+            }
+            .setNegativeButton("Batal", null).show()
+    }
+
+    private fun copyUrl(link: String) {
+        getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("url", link))
+        toast("URL disalin")
+    }
+
+    private fun deleteDialog(i: Int) {
+        AlertDialog.Builder(this).setMessage("Hapus \"${list[i].name}\"?")
+            .setPositiveButton("Hapus") { _, _ ->
+                list.removeAt(i); st.save(list)
+                if (st.sel >= list.size) st.sel = 0
+                refresh()
+            }.setNegativeButton("Batal", null).show()
     }
 
     private fun startVpn() {
