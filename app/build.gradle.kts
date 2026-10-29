@@ -9,13 +9,26 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    signingConfigs {
+        create("xailla") {
+            storeFile = file("xailla.jks")
+            storePassword = "xailla123"
+            keyAlias = "xailla"
+            keyPassword = "xailla123"
+        }
+    }
     splits { abi {
         isEnable = true; reset()
         include("armeabi-v7a", "arm64-v8a")
-        isUniversalApk = true
+        isUniversalApk = false
     } }
     packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += "**/*.so" } }
-    buildTypes { release { isMinifyEnabled = false; signingConfig = signingConfigs.getByName("debug") } }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("xailla")
+        }
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }
