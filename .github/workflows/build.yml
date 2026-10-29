@@ -36,17 +36,14 @@ jobs:
         with: { gradle-version: "8.7" }
       - run: gradle assembleRelease --no-daemon
 
-      - name: Kumpulkan APK jadi zip
-        run: |
-          R=app/build/outputs/apk/release
-          echo "File APK yang dibuat:"; ls -la $R
-          mkdir -p out
-          cp $R/*armeabi-v7a*.apk out/xaillavpn-armeabi-v7a.apk
-          cp $R/*arm64-v8a*.apk out/xaillavpn-arm64-v8a.apk
-          cp $R/*universal*.apk out/xaillavpn-universal.apk
-          cd out && zip -r ../xaillavpn-apk.zip . && cd ..
-
-      - uses: actions/upload-artifact@v4
+      - name: Ambil APK armeabi-v7a
+        uses: actions/upload-artifact@v4
         with:
-          name: xaillavpn-apk
-          path: xaillavpn-apk.zip
+          name: xaillavpn-armeabi-v7a
+          path: app/build/outputs/apk/release/*armeabi-v7a*.apk
+
+      - name: Ambil APK arm64-v8a
+        uses: actions/upload-artifact@v4
+        with:
+          name: xaillavpn-arm64-v8a
+          path: app/build/outputs/apk/release/*arm64-v8a*.apk
